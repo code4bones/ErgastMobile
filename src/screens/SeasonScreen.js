@@ -1,12 +1,12 @@
-import React,{Component} from 'react';
+import React,{useEffect} from 'react';
 import { StyleSheet,View,TouchableOpacity,Linking,RefreshControl,Text } from 'react-native'; 
 import FaIcon from 'react-native-vector-icons/FontAwesome5';
 import {FlatGrid} from 'react-native-super-grid';
+import { connect } from 'react-redux';
 
-import {Seasons} from 'system/Cursors';
 import NavigationButtonsGroup from 'components/NavigationButtonsGroup';
 import Card from 'components/Card';
-import { AppContext,withAppContextProvider } from 'system/AppContext';
+import seasonsActions from 'store/domains/seasons/seasonsActions';
 
 const SeasonItem = ({item,onShowDetail}) => {
     return (
@@ -25,79 +25,55 @@ const SeasonItem = ({item,onShowDetail}) => {
     )
 }
 
-class SessionScreen extends Component {
+const SeasonScreen = ({cursor,error,seasons,reset,move,navigation}) => {
 
-    static contextType = AppContext;
+    useEffect(()=>{
+        if ( !seasons.length )
+            move(0);
+    },[])
 
-    state = {
-        items:[],
-        cursor:null,
-        loading:false
-    }
+    useEffect(()=>{
+        navigation.setOptions({
+            title:`Сезоны - ${cursor.page+1} / ${cursor.pages}`
+           ,headerRight:props => <NavigationButtonsGroup cursor={cursor} onMove={move} />            
+       })
+   })
 
-    constructor(props) {
-        super(props);
-        this.seasons = new Seasons();
-        this.unsubscribe = this.seasons.subj.subscribe(this.onItems);
-    }
+    const onShowDetail = (season) => navigation.push('SeasonDetailScreen',{season})
+    
+    return (
+        <FlatGrid 
+            refreshing={cursor.loading}
+            itemDimension={80}
+            style={styles.flatGrid}
+            spacing={2}
+            data={seasons}
+            refreshControl={<RefreshControl size={RefreshControl.SIZE.LARGE} title="Обновление" refreshing={cursor.loading} onRefresh={() => reset()} />}
+            renderItem={({item}) => (<SeasonItem item={item} onShowDetail={onShowDetail} />)}
+        />
+    )
+}
 
-    componentDidMount = () => {
-        this.onRefresh();
-    }
 
-    componentWillUnmount = () => {
-    }
-
-    onItems = (data) => {
-        if ( !data )
-            return; 
-        this.setState({items:data.items,cursor:data.cursor,loading:false,error:data.error},()=>{
-            this.updateTitle();
-        });
-    }
-
-    updateTitle = () => {
-        if ( !this.state.cursor )
-            return 'Загрузка...';
-        this.props.navigation.setOptions({
-             title:`Сезоны - ${this.state.cursor.page+1} / ${this.state.cursor.pages}`
-            ,headerRight:props => <NavigationButtonsGroup cursor={this.state.cursor} onMove={(dir) => this.onMove(dir)} />            
-        })
-    }
-
-    onMove = (direction) => {
-        const page = this.state.cursor?.page || 0;
-        this.setState({loading:true});
-        const found = this.context.lookupCache(this.seasons,{page,direction});
-        if ( found )
-            return;
-        this.seasons.move(page + direction);
-    }
-
-    onRefresh = () => {
-        this.seasons.reset();
-        this.onMove(0);
-    }
-
-    onShowDetail = (item) => {
-        console.log("Detail",item)
-        this.props.navigation.push('SeasonDetailScreen',{season:item})
-    }
-
-    render() {
-        return (
-                <FlatGrid 
-                    refreshing={this.state.loading}
-                    itemDimension={80}
-                    style={styles.flatGrid}
-                    spacing={2}
-                    data={this.state.items}
-                    refreshControl={<RefreshControl size={RefreshControl.SIZE.LARGE} title="Обновление" refreshing={this.state.loading} onRefresh={this.onRefresh} />}
-                    renderItem={({item}) => (<SeasonItem item={item} onShowDetail={this.onShowDetail} />)}
-                    />
-        )
+const mapStateToProps = (state) => {
+    const {seasons,cursor,error} = state.seasonsReducers;
+    if ( error )
+        throw new Error(error.message)
+    return {
+        seasons,
+        cursor
     }
 }
+
+const mapDispatchToProps = (dispatch,props) => {
+    return {
+         move: (direction) => dispatch(seasonsActions.navigate(direction))
+        ,reset: () => dispatch(seasonsActions.reset())
+    }
+}
+
+export default connect(mapStateToProps,mapDispatchToProps)(SeasonScreen);
+
 
 const styles = StyleSheet.create({
     flatGrid: {
@@ -123,4 +99,3 @@ const styles = StyleSheet.create({
     }
 })
 
-export default withAppContextProvider(SessionScreen); 

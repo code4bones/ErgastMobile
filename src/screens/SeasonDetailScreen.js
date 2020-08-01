@@ -1,12 +1,13 @@
-import React,{Component} from 'react';
+import React,{useEffect} from 'react';
 import { Linking,RefreshControl } from 'react-native'; 
 import {SectionGrid} from 'react-native-super-grid';
 import {StyleSheet,View,Text} from 'react-native';
 
-import {withAppContextProvider} from 'system/AppContext'; 
-import {SeasonDetails} from 'system/Cursors';
 import NavigationButtonsGroup from 'components/NavigationButtonsGroup';
 import Card from 'components/Card';
+import { connect } from 'react-redux';
+import seasonsDetailsActions from 'store/domains/seasons/seasonsDetailsActions';
+
 
 const RaceHeader = ({section}) => 
     <View style={styles.raceHeader}>
@@ -42,73 +43,57 @@ const RaceItem = ({item}) => {
     )
 }
 
-class SessionDetailScreen extends Component {
+const SessionDetailScreen = ({cursor,details,reset,move,navigation,route,detailsForSeason}) => {
 
-    state = {
-        items:[],
-        cursor:null,
-        loading:false,
-        season:{}
-    }
+    useEffect(()=>{
+        const season = route.params.season;
+        detailsForSeason(season);
+    },[])
 
-    constructor(props) {
-        super(props);
-        const season = props.route.params.season;
-        this.details = new SeasonDetails(season.season);
-        this.unsubscribe = this.details.subj.subscribe(this.onItems);
-    }
 
-    componentDidMount = () => {
-        this.onRefresh();
-    }
-
-    onItems = (data) => {
-        const sections = [{
-            title:this.props.route.params.season.season
-           ,data:data.items
-       }]
-       this.setState(state => ({
-           items:sections
-           ,cursor:data.cursor
-           ,loading:false
-       }));
-    }
-
-    updateTitle = () => {
-        if ( !this.state.cursor )
-            return 'Загрузка...';
-        this.props.navigation.setOptions({
-            title:`Детализация - ${this.state.cursor.page+1} / ${this.state.cursor.pages}`
-            ,headerRight:props => <NavigationButtonsGroup onMove={(dir) => this.onMove(dir)} />            
+    useEffect(()=>{
+        navigation.setOptions({
+            title:`Детализация - ${cursor.page+1} / ${cursor.pages}`
+            ,headerRight:props => <NavigationButtonsGroup cursor={cursor} onMove={move} />            
         })
-    }
+    })
 
-    onMove = (direction) => {
-        const page = this.state.cursor?.page || 0;
-        this.setState({loading:true});
-        this.details.move(page + direction);
-    }
 
-    onRefresh = () => {
-        this.details.reset();
-        this.onMove(0);
-    }
+    return (
+        <SectionGrid 
+            refreshing={cursor.loading}
+            itemDimension={600}
+            style={styles.flatGrid}
+            spacing={2}
+            sections={details}
+            refreshControl={<RefreshControl size={RefreshControl.SIZE.LARGE} title="Обновление" refreshing={cursor.loading} onRefresh={reset} />}
+            renderSectionHeader={({section})=><RaceHeader section={section} />}
+            renderItem={({item}) => (<RaceItem item={item} />)}
+            />
+    )
+}
 
-    render() {
-        return (
-                <SectionGrid 
-                    refreshing={this.state.loading}
-                    itemDimension={600}
-                    style={styles.flatGrid}
-                    spacing={2}
-                    sections={this.state.items}
-                    refreshControl={<RefreshControl size={RefreshControl.SIZE.LARGE} title="Обновление" refreshing={this.state.loading} onRefresh={this.onRefresh} />}
-                    renderSectionHeader={({section})=><RaceHeader section={section} />}
-                    renderItem={({item}) => (<RaceItem item={item} />)}
-                    />
-        )
+
+const mapStateToProps = (state) => {
+    const {details,cursor,error} = state.seasonDetailsReducers;
+    if ( error )
+        throw new Error(error.message)
+    return {
+        details,
+        cursor
     }
 }
+
+const mapDispatchToProps = (dispatch,props) => {
+    return {
+        detailsForSeason: (season) => dispatch(seasonsDetailsActions.detailsForSeason(season))
+        ,move: (direction) => dispatch(seasonsDetailsActions.navigate(direction))
+    }
+}
+
+
+export default connect(mapStateToProps,mapDispatchToProps)(SessionDetailScreen);
+
 
 const styles = StyleSheet.create({
     flatGrid: {
@@ -154,4 +139,4 @@ const styles = StyleSheet.create({
     }
 })
 
-export default withAppContextProvider(SessionDetailScreen); 
+//export default withAppContextProvider(SessionDetailScreen); 

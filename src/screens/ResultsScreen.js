@@ -1,12 +1,12 @@
-import React,{Component} from 'react';
+import React,{useEffect} from 'react';
 import { StyleSheet,View,RefreshControl,Text } from 'react-native'; 
 
 import {SectionGrid} from 'react-native-super-grid';
 import Card from 'components/Card';
 import NavigationButtonsGroup from 'components/NavigationButtonsGroup';
-import {withAppContextProvider,AppContext} from 'system/AppContext'; 
-import {Results} from 'system/Cursors';
 
+import { connect } from 'react-redux';
+import resultsActions from 'store/domains/results/resultsActions';
 
 const ResultItem = ({item,onShowDetail}) => {
     return (
@@ -35,78 +35,58 @@ const ResultItem = ({item,onShowDetail}) => {
 const ResultSection = ({section}) =>
     <View style={styles.sectionBgr}><Text style={styles.sectionTitle}>{section.title}</Text></View>
 
-class ResultsScreen extends Component {
 
-    static contextType = AppContext;
+const ResultsScreen = ({results,cursor,move,reset,navigation}) => {
 
-    state = {
-        sections:[],
-        cursor:null,
-        loading:false
-    }
+    useEffect(()=>{
+        if ( !results.length )
+            move(0)
+    },[])
 
-    constructor(props) {
-        super(props);
-        this.results = new Results();
-        this.unsubscribe = this.results.subj.subscribe(this.onItems);
-    }
-
-    componentDidMount = () => {
-        this.onRefresh();
-    }
-
-    updateTitle = () => {
-        if ( !this.state.cursor )
-            return 'Загрузка...';
-        this.props.navigation.setOptions({
-            title:`Результаты - ${this.state.cursor.page+1} / ${this.state.cursor.pages}`
-            ,headerRight:props => <NavigationButtonsGroup cursor={this.state.cursor} onMove={(dir) => this.onMove(dir)} />
+    useEffect(()=>{
+        navigation.setOptions({
+            title:`Результаты - ${cursor.page+1} / ${cursor.pages}`
+            ,headerRight:props => <NavigationButtonsGroup cursor={cursor} onMove={move} />
         })
-    }
+    })
 
-    onItems = (data) => {
-        const sections = data.items.map (race => ({
-            title:`${race.raceName} ${race.date}`,
-            data:race.QualifyingResults
-        }))     
-        this.setState({sections:sections,cursor:data.cursor,loading:false});
-        this.updateTitle();
+    const onShowDetail = (title,obj) => {
+        navigation.push('DetailsScreen',{details:obj,title:title});
     }
+ 
+    return (
+        <SectionGrid 
+            refreshing={cursor.loading}
+            itemDimension={600}
+            style={styles.flatGrid}
+            spacing={2}
+            sections={results}
+            refreshControl={<RefreshControl size={RefreshControl.SIZE.LARGE} title="Обновление" refreshing={cursor.loading} onRefresh={() => reset()} />}
+            renderItem={({item,section}) => (<ResultItem item={item} onShowDetail={onShowDetail} />)}
+            renderSectionHeader={({section})=><ResultSection section={section} />}
+        />
+    )
+}
 
-    onMove = (direction) => {
-        const page = this.state.cursor?.page || 0;
-        this.setState({loading:true});
-        const found = this.context.lookupCache(this.results,{page,direction});
-        if ( found )
-            return;
-        this.results.move(page + direction);
-    }
 
-    onRefresh = () => {
-        this.results.reset();
-        this.onMove(0);
-    }
-
-    onShowDetail = (title,obj) => {
-        this.props.navigation.push('DetailsScreen',{details:obj,title:title});
-    //    console.log(item);
-    }
-
-    render() {
-        return (
-                <SectionGrid 
-                    refreshing={this.state.loading}
-                    itemDimension={600}
-                    style={styles.flatGrid}
-                    spacing={2}
-                    sections={this.state.sections}
-                    refreshControl={<RefreshControl size={RefreshControl.SIZE.LARGE} title="Обновление" refreshing={this.state.loading} onRefresh={this.onRefresh} />}
-                    renderItem={({item,section}) => (<ResultItem item={item} onShowDetail={this.onShowDetail} />)}
-                    renderSectionHeader={({section})=><ResultSection section={section} />}
-                    />
-        )
+const mapStateToProps = ({resultsReducers}) => {
+    const {results,cursor,error} = resultsReducers;
+    if ( error )
+        throw new Error(error.message)
+    return {
+        results,
+        cursor
     }
 }
+
+const mapDispatchToProps = (dispatch,props) => {
+    return {
+         move: (direction) => dispatch(resultsActions.navigate(direction))
+        ,reset: () => dispatch(resultsActions.reset())
+    }
+}
+
+export default connect(mapStateToProps,mapDispatchToProps)(ResultsScreen);
 
 const styles = StyleSheet.create({
     flatGrid: {
@@ -147,4 +127,4 @@ const styles = StyleSheet.create({
     }
 })
 
-export default withAppContextProvider(ResultsScreen); 
+//export default withAppContextProvider(ResultsScreen); 

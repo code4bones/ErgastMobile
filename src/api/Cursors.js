@@ -1,22 +1,25 @@
 import axios from 'react-native-axios';
-import qs from 'query-string';
-import {Subject,ReplaySubject} from 'rxjs';
 
 const BASE_URL =  'http://ergast.com/api/f1';
 
+const CURSOR_INIT = {
+    page:0,
+    pages:'...',
+    loading:false,
+    total:0
+}
+
 class DataCursor {
-    constructor(api,cursor = {offset:0,limit:30}) {
+    constructor(api,cursor = {offset:0,limit:20}) {
         this.api    = api;
         this.cursor = { 
             ...cursor
-            ,page:0
-            ,pages:0
+            ,...CURSOR_INIT
         }
-        this.subj = new Subject();
     }
 
     fetch = async (page = 0) => {
-            
+          
             if ( page < 0 || this.cursor.pages && page >= this.cursor.pages )
                 return null;
 
@@ -25,7 +28,7 @@ class DataCursor {
             const res = await axios.get(`${BASE_URL}/${this.api}.json?${query}`);
             if ( !res.data || !res.data.hasOwnProperty("MRData") )
                 throw Error(`AXIOS: data filed is null, or "MRData" field is missing ( ${res.status} / ${res.statusText} )`);
-            
+
             const {MRData} = res.data;
             this.cursor.total   = MRData.total;
             this.cursor.pages   = Math.ceil(this.cursor.total / this.cursor.limit);
@@ -36,9 +39,7 @@ class DataCursor {
     reset = () => {
         this.cursor = {
             ...this.cursor,
-            offset:0,
-            page:0,
-            pages:0,
+            ...CURSOR_INIT
         }
     }
 
@@ -49,14 +50,13 @@ class DataCursor {
             throw Error(`[DataCursor::normalize] api "${this.api}" returns no records !`)
         }
         this.result = {items:recs,cursor:this.cursor}; 
-        this.subj.next(this.result);
         return this.result;
     }
 }
 
 class SeasonDetails extends DataCursor {
-    constructor(season) {
-        super(season);
+    constructor(season,cursor = {offset:0,limit:5}) {
+        super(season,cursor);
     }
     move = async(direction) => {
         try {            
@@ -78,7 +78,7 @@ class Seasons extends DataCursor {
             const res = await this.fetch(direction);
             return this.normalize(res?.SeasonTable?.Seasons)
         } catch ( e ) {
-            console.log(e.message);
+            console.log("Seasons",e);
             return {error:e.message,state:this.cursor}
         }
     }    
@@ -115,10 +115,15 @@ class Constructors extends DataCursor {
     }    
 }
 
+const Cursors = {
+     seasons:new Seasons()
+    ,results:new Results()
+    ,constructors:new Constructors()
+}
+
 
 export {
-    Seasons,
-    Results,
-    SeasonDetails,
-    Constructors
+    CURSOR_INIT,
+    Cursors,
+    SeasonDetails
 }

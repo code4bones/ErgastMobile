@@ -16,8 +16,8 @@ module.exports = {
           navigators:'./src/navigators',
           components:'./src/components',
           screens:'./src/screens',
-          system:'./src/system',
-          styles:'./src/styles'
+          api:'./src/api',
+          store:'./src/store'
         },
       },
     ],

@@ -1,27 +1,20 @@
-import React,{Component} from 'react';
+import React,{useEffect,useState} from 'react';
 import {Linking,Text,StyleSheet,View} from 'react-native';
-import {withAppContextProvider} from 'system/AppContext'; 
 
-class SimpleJSONScreen extends Component {
+export default SimpleJSONScreen = ({route,navigation}) => {
+    const [keys,setKeys] = useState([]);
+    const [details,setDetails] = useState([]);
 
-    state = {
-        details:{}
-        ,title:''
-    }
-
-    componentDidMount = () => {
-        console.log("Details",this.props.route.params);
-        const {details,title} = this.props.route.params;
-        this.setState({details,title});
-        this.props.navigation.setOptions({
+    useEffect(()=>{
+        const {details,title} = route.params;
+        const keys = Object.keys(details);
+        setKeys(keys);
+        setDetails(details);
+        navigation.setOptions({
             title
         })
-    }
+    },[])
 
-
-    render() {
-        const {details} = this.state;
-        const keys = Object.keys(details);
         return (
             <View style={styles.view}>
                 {
@@ -45,8 +38,8 @@ class SimpleJSONScreen extends Component {
                 }
             </View>
         )
-    }
 }
+
 
 const styles = StyleSheet.create({
     view:{
@@ -78,4 +71,3 @@ const styles = StyleSheet.create({
     }
 })
 
-export default withAppContextProvider(SimpleJSONScreen); 

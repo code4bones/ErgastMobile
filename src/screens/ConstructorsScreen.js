@@ -1,15 +1,16 @@
-import React,{Component} from 'react';
+import React,{useEffect} from 'react';
 import {StyleSheet, Linking,RefreshControl,Text,View } from 'react-native'; 
 
 
 import {FlatGrid} from 'react-native-super-grid';
 
-import {Constructors} from 'system/Cursors';
 import NavigationButtonsGroup from 'components/NavigationButtonsGroup';
-import { AppContext,withAppContextProvider } from 'system/AppContext';
 import Card from 'components/Card';
 
-const ConstructorItem = ({item,onShowDetail}) => {
+import { connect } from 'react-redux';
+import constructorsActions from 'store/domains/constructors/constructorsActions';
+
+const ConstructorItem = ({item}) => {
     return (
         <Card>
             <View style={styles.viewItem}>
@@ -22,80 +23,55 @@ const ConstructorItem = ({item,onShowDetail}) => {
     )
 }
 
-class ConstructorsScreen extends Component {
+const ConstructorsScreen = ({cursor,constructors,reset,move,navigation}) => {
+    
+    useEffect(()=>{
+        if ( !constructors.length )
+            move(0);
+    },[])
 
-    static contextType = AppContext;
+    useEffect(()=>{
+        navigation.setOptions({
+            title:`Конструкторы - ${cursor.page+1} / ${cursor.pages}`
+           ,headerRight:props => <NavigationButtonsGroup cursor={cursor} onMove={move} />            
+       })
+      })
+      
+    return (
+        <FlatGrid 
+            refreshing={cursor.loading}
+            itemDimension={130}
+            style={styles.flatGrid}
+            spacing={2}
+            data={constructors}
+            refreshControl={<RefreshControl size={RefreshControl.SIZE.LARGE} title="Обновление" refreshing={cursor.loading} onRefresh={reset} />}
+            renderItem={({item}) => (<ConstructorItem item={item} />)}
+            />
+    )
 
-    state = {
-        items:[],
-        cursor:null,
-        loading:false
-    }
+}
 
-    constructor(props) {
-        super(props);
-        this.ctors = new Constructors();
-        this.unsubscribe = this.ctors.subj.subscribe(this.onItems);
-    }
 
-    componentDidMount = () => {
-        this.onRefresh();
-    }
-
-    componentWillUnmount = () => {
-    }
-
-    onItems = (data) => {
-        if ( !data )
-            return; 
-        this.setState({items:data.items,cursor:data.cursor,loading:false,error:data.error},()=>{
-            this.updateTitle();
-        });
-    }
-
-    updateTitle = () => {
-        if ( !this.state.cursor )
-            return 'Загрузка...';
-        this.props.navigation.setOptions({
-             title:`Конструкторы - ${this.state.cursor.page+1} / ${this.state.cursor.pages}`
-            ,headerRight:props => <NavigationButtonsGroup cursor={this.state.cursor} onMove={(dir) => this.onMove(dir)} />            
-        })
-    }
-
-    onMove = (direction) => {
-        const page = this.state.cursor?.page || 0;
-        // dummy
-        this.setState({loading:true});
-        const found = this.context.lookupCache(this.ctors,{page,direction});
-        if ( found )
-            return;
-        this.ctors.move(page + direction);
-    }
-
-    onRefresh = () => {
-        this.ctors.reset();
-        this.onMove(0);
-    }
-
-    onShowDetail = (item) => {
-        console.log("Detail",item)
-        //this.props.navigation.push('SeasonDetailScreen',{season:item})
-    }
-
-    render() {
-        return (
-                <FlatGrid 
-                    refreshing={this.state.loading}
-                    itemDimension={130}
-                    style={styles.flatGrid}
-                    spacing={2}
-                    data={this.state.items}
-                    refreshControl={<RefreshControl size={RefreshControl.SIZE.LARGE} title="Обновление" refreshing={this.state.loading} onRefresh={this.onRefresh} />}
-                    renderItem={({item}) => (<ConstructorItem item={item} />)}
-                    />
-        )
+const mapStateToProps = ({constructorsReducers}) => {
+    const {constructors,cursor,error} = constructorsReducers;
+    if ( error )
+        throw new Error(error.message)
+    return {
+        constructors,
+        cursor
     }
 }
+
+const mapDispatchToProps = (dispatch,props) => {
+    return {
+         move: (direction) => dispatch(constructorsActions.navigate(direction))
+        ,reset: () => dispatch(constructorsActions.reset())
+    }
+}
+
+export default connect(mapStateToProps,mapDispatchToProps)(ConstructorsScreen);
+
+
 
 const styles = StyleSheet.create({
     flatGrid: {
@@ -117,4 +93,4 @@ const styles = StyleSheet.create({
     }
 })
 
-export default withAppContextProvider(ConstructorsScreen); 
+//export default withAppContextProvider(ConstructorsScreen); 
